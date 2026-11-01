@@ -8,7 +8,7 @@
 	  font-style: normal;
 }
 .schedule { max-width: 600px; }
-
+body{background:rgba(255,0,0,.05);}
 .schedule .schedule-title { font-size: 1.4em; line-height: 1.2; font-weight: bold; margin: 0 0 1.2em; 
 	font-family: "EB Garamond", serif!important;
 	  font-optical-sizing: auto;
