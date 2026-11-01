@@ -1,0 +1,76 @@
+# Publishes the website to GitHub Pages with the latest schedule from the Google Doc.
+#
+# It runs:
+#   - every 15 minutes, publishing only if the schedule has changed
+#   - whenever a change to the site is pushed
+#   - when someone clicks "Run workflow" on the Actions tab
+
+name: Update schedule
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  # The Google Doc with the schedule. Its whole address is fine.
+  # It must be shared as "Anyone with the link - Viewer".
+  SCHEDULE_DOC: "https://docs.google.com/document/d/1M0uXmirrqKRLs5qfV-FqQNWkGtaiMdtMPfio378qbm8/edit?tab=t.0"
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.build.outputs.changed }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: pages
+        uses: actions/configure-pages@v5
+
+      - id: build
+        name: Build the site with the latest schedule
+        env:
+          LIVE_URL: ${{ steps.pages.outputs.base_url }}
+          FORCE_DEPLOY: ${{ github.event_name != 'schedule' }}
+        run: php tools/build.php
+
+      - if: steps.build.outputs.changed == 'true'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      # GitHub switches off timers in a repository with no activity for 60 days.
+      # This makes a small empty commit every 50 quiet days to keep it running.
+      - name: Keep the timer switched on
+        if: github.event_name == 'schedule'
+        run: |
+          last=$(git log -1 --format=%ct)
+          if [ $(( $(date +%s) - last )) -gt $(( 50 * 86400 )) ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit --allow-empty -m "Keep the schedule timer running"
+            git push
+          fi
+
+  deploy:
+    needs: build
+    if: needs.build.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
