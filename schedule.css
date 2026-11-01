@@ -1,7 +1,12 @@
 /* ---- schedule (from Google Doc) ----
    Link this from the page, or paste it into your own stylesheet.
    It only sets layout and spacing: the font and text colour come from your site. */
-
+*{
+	font-family: "EB Garamond", serif;
+	  font-optical-sizing: auto;
+	  font-weight: <weight>;
+	  font-style: normal;
+}
 .schedule { max-width: 600px; }
 
 .schedule .schedule-title { font-size: 1.4em; line-height: 1.2; font-weight: bold; margin: 0 0 1.2em; }
