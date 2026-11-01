@@ -2,7 +2,7 @@
    Link this from the page, or paste it into your own stylesheet.
    It only sets layout and spacing: the font and text colour come from your site. */
 *{
-	font-family: "EB Garamond", serif;
+	font-family: "EB Garamond", serif!important;
 	  font-optical-sizing: auto;
 	  font-weight: <weight>;
 	  font-style: normal;
