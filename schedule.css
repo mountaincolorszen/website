@@ -6,6 +6,7 @@
 	  font-optical-sizing: auto;
 	  font-weight: <weight>;
 	  font-style: normal;
+	  /*font-size:1.2rem;*/
 }
 .schedule { max-width: 600px; }
 
@@ -17,6 +18,19 @@
 	font-family: "EB Garamond", serif!important;
 	  font-optical-sizing: auto;
 	  font-style: normal;
+	  margin-block-start: 0em;
+}
+
+table{
+	font-size:1.1rem;
+	font-family: "IBM Plex Sans", sans-serif;
+	border-spacing: 0px;
+
+}
+
+footer{
+	margin-top:2rem;
+	/*text-align:center;*/
 }
 
 .mcz-intro{
@@ -36,7 +50,7 @@ body{background:rgba(255,0,0,.05)!important;}
 
 .schedule-day { margin: 0 0 .5em; padding-top: 0.0em; border-top: .1px solid #ccc; }
 .schedule-day h3 { font-size: 1.4em; margin: 0 0 0.4em; 
-	  font-family: "Jost", sans-serif;
+	  font-family: "IBM Plex Sans", sans-serif;
 	  font-optical-sizing: auto;
 	  font-weight: <weight>;
 	  font-style: normal;}
@@ -57,10 +71,23 @@ body{background:rgba(255,0,0,.05)!important;}
 	}
 
 	.donate{
+		font-size:1.4rem;
 		max-width:100%;
 		border: none;
-		background:red;
+		background:pink;
+		border-radius:5px;
+		padding:.5rem;
+		margin-top:2rem;
+		margin-bottom:2rem;
 	}
+
+	.donate:focus{background-color:red;}
+	.donate:hover{
+		background-color:red;
+		transition:.5s;
+	}
+		
+
 
 /* bold, italic etc. carried over from the doc */
 .schedule strong { font-weight: bold; }
