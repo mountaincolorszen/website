@@ -20,7 +20,7 @@
 }
 
 .mcz-intro{
-	font-size:1.5rem;
+	font-size:1.4rem;
 	font-family: "EB Garamond", serif!important;
 	  font-optical-sizing: auto;
 	  font-style: normal;
@@ -34,8 +34,8 @@ body{background:rgba(255,0,0,.05)!important;}
 	  font-style: normal;}
 .schedule .schedule-note { margin: 0 0 1.5em; }
 
-.schedule-day { margin: 0 0 .5em; padding-top: 0.6em; border-top: .1px solid #ccc; }
-.schedule-day h3 { font-size: 1em; font-weight: bold; margin: 0 0 0.4em; 
+.schedule-day { margin: 0 0 .5em; padding-top: 0.0em; border-top: .1px solid #ccc; }
+.schedule-day h3 { font-size: 1.4em; margin: 0 0 0.4em; 
 	font-family: "EB Garamond", serif!important;
 	  font-optical-sizing: auto;
 	  font-weight: <weight>;
@@ -64,6 +64,6 @@ body{background:rgba(255,0,0,.05)!important;}
 
 /* phones: put the time above the event */
 @media (max-width: 480px) {
-	.schedule-day li { display: block; padding: 0.3em 0; }
+	.schedule-day li { display: block; padding: 0.0em 0; }
 	.schedule-time { display: block; font-weight: bold; }
 }
