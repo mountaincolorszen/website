@@ -72,10 +72,10 @@ body{background:rgba(255,0,0,.05)!important;}
 
 	.donate{
 		font-size:1.4rem;
-		max-width:100%;
+		width:100%;
 		border: none;
 		background:pink;
-		border-radius:5px;
+		border-radius:50px;
 		padding:.5rem;
 		margin-top:2rem;
 		margin-bottom:2rem;
