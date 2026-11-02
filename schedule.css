@@ -49,7 +49,7 @@ body{background:rgba(255,0,0,.05)!important;}
 .schedule .schedule-note { margin: 0 0 1.5em; }
 
 .schedule-day { margin: 0 0 .5em; padding-top: 0.0em; border-top: .1px solid #ccc; }
-.schedule-day h3 { font-size: 1.4em; margin: 0 0 0.4em; 
+.schedule-day h3 { font-size: 1.1em; margin: 0 0 0.4em; 
 	  font-family: "IBM Plex Sans", sans-serif;
 	  font-optical-sizing: auto;
 	  font-weight: <weight>;
@@ -87,7 +87,10 @@ body{background:rgba(255,0,0,.05)!important;}
 		transition:.5s;
 	}
 		
-
+.time{
+	margin-top:4rem;
+	margin-bottom:4rem;
+}
 
 /* bold, italic etc. carried over from the doc */
 .schedule strong { font-weight: bold; }
