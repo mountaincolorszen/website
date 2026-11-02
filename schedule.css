@@ -26,7 +26,7 @@
 	  font-style: normal;
 }
 
-body{background:rgba(255,0,0,.05);}
+body{background:rgba(255,0,0,.05)!important;}
 .schedule .schedule-title { font-size: 1.4em; line-height: 1.2; font-weight: bold; margin: 0 0 1.2em; 
 	font-family: "EB Garamond", serif!important;
 	  font-optical-sizing: auto;
