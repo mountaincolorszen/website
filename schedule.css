@@ -20,7 +20,8 @@
 	  font-optical-sizing: auto;
 	  font-style: normal;
 	  margin-block-start: 0em;
-	  color:darkolivegreen!important
+	  color:darkolivegreen!important;
+	  text-align:center;
 }
 
 table{
@@ -42,6 +43,7 @@ footer{
 	  font-optical-sizing: auto;
 	  font-style: normal;
 	  color:darkolivegreen!important;
+	  /*text-align:center;*/
 }
 
 body{background:rgba(255,0,0,.05)!important;}
