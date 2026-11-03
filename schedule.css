@@ -6,6 +6,7 @@
 	  font-optical-sizing: auto;
 	  font-weight: <weight>;
 	  font-style: normal;
+	  color:darkolivegreen!important;
 	  /*font-size:1.2rem;*/
 }
 .schedule { max-width: 600px; }
@@ -19,12 +20,14 @@
 	  font-optical-sizing: auto;
 	  font-style: normal;
 	  margin-block-start: 0em;
+	  color:darkolivegreen!important
 }
 
 table{
 	font-size:1.1rem;
 	font-family: "IBM Plex Sans", sans-serif;
 	border-spacing: 0px;
+	color:darkolivegreen!important
 
 }
 
@@ -83,7 +86,7 @@ body{background:rgba(255,0,0,.05)!important;}
 
 	.donate:focus{background-color:red;}
 	.donate:hover{
-		background-color:red;
+		background-color:white;
 		transition:.5s;
 	}
 		
@@ -91,6 +94,8 @@ body{background:rgba(255,0,0,.05)!important;}
 	margin-top:4rem;
 	margin-bottom:4rem;
 }
+
+img {border-radius:5px;}
 
 /* bold, italic etc. carried over from the doc */
 .schedule strong { font-weight: bold; }
