@@ -9,11 +9,36 @@
 	  /*color:darkolivegreen!important;*/
 	  /*font-size:1.2rem;*/
 }
-.schedule { max-width: 600px; }
-
-::selection {
- color:red;
+.schedule { max-width: 600px; }::selection {
+ color:blue;
 }
+
+@media (max-width: 720px) {
+	.logo{
+ display: block;
+  margin: auto;
+  width: 70%!important;
+}
+}
+
+.logo{
+ display: block;
+  margin: auto;
+  width: 50%;
+}
+
+.social-instagram{
+ display: block;
+  /*margin: auto;*/
+  width: 10%;
+  padding-top: 10%;
+}
+
+a:visited {
+  color: forestgreen;
+  text-decoration-color: hotpink;
+}
+
 .title{
 	font-size:2rem;
 	font-family: "EB Garamond", serif!important;
@@ -21,47 +46,39 @@
 	  font-style: normal;
 	  margin-block-start: 0em;
 	  color:darkolivegreen!important;
-	  text-align:center;
+	  text-align:center!important;
+	  font-weight:300!important;
 }
 
 table{
 	font-size:1.1rem;
 	font-family: "IBM Plex Sans", sans-serif;
 	border-spacing: 0px;
-	color:darkolivegreen!important
-
-}
-
-footer{
+	color:darkolivegreen!important}footer{
 	margin-top:2rem;
 	/*text-align:center;*/
-}
-
-.mcz-intro{
+}.mcz-intro{
 	font-size:1.4rem;
+	line-height:1.7rem;
 	font-family: "EB Garamond", serif!important;
 	  font-optical-sizing: auto;
 	  font-style: normal;
 	  color:darkolivegreen!important;
 	  /*text-align:center;*/
 }
-
-body{background:rgba(255,0,0,.05)!important;}
+body{  background: linear-gradient(0deg, #fff9e6 0%, #ffeae6 100%)!important;
+}
 .schedule .schedule-title { font-size: 1.4em; line-height: 1.2; font-weight: bold; margin: 0 0 1.2em; 
 	font-family: "EB Garamond", serif!important;
 	  font-optical-sizing: auto;
 	  font-weight: <weight>;
 	  font-style: normal;}
-.schedule .schedule-note { margin: 0 0 1.5em; }
-
-.schedule-day { margin: 0 0 .5em; padding-top: 0.0em; border-top: .1px solid #ccc; }
+.schedule .schedule-note { margin: 0 0 1.5em; }.schedule-day { margin: 0 0 .5em; padding-top: 0.0em; border-top: .1px solid #ccc; }
 .schedule-day h3 { font-size: 1.1em; margin: 0 0 0.4em; 
 	  font-family: "IBM Plex Sans", sans-serif;
 	  font-optical-sizing: auto;
 	  font-weight: <weight>;
-	  font-style: normal;}
-
-.schedule-day ul { list-style: none; margin: 0; padding: 0; 
+	  font-style: normal;}.schedule-day ul { list-style: none; margin: 0; padding: 0; 
 	font-family: "EB Garamond", serif!important;
 	  font-optical-sizing: auto;
 	  font-weight: <weight>;
@@ -74,9 +91,7 @@ body{background:rgba(255,0,0,.05)!important;}
 	  font-weight: <weight>;
 	  font-style: normal;
 	  padding:0!important;
-	}
-
-	.donate{
+	}	.donate{
 		font-size:1.4rem;
 		width:100%;
 		border: none;
@@ -85,9 +100,7 @@ body{background:rgba(255,0,0,.05)!important;}
 		padding:.5rem;
 		margin-top:2rem;
 		margin-bottom:2rem;
-	}
-
-	.donate:focus{background-color:red;}
+	}	.donate:focus{background-color:red;}
 	.donate:hover{
 		background-color:white;
 		transition:.5s;
@@ -96,21 +109,13 @@ body{background:rgba(255,0,0,.05)!important;}
 .time{
 	margin-top:4rem;
 	margin-bottom:4rem;
-}
-
-img {border-radius:5px;}
-
-/* bold, italic etc. carried over from the doc */
+}img {border-radius:5px;}/* bold, italic etc. carried over from the doc */
 .schedule strong { font-weight: bold; }
 .schedule em { font-style: italic; }
 .schedule u { text-decoration: underline; }
-.schedule s { text-decoration: line-through; }
-
-.schedule-time { flex: 0 0 9em; white-space: nowrap; }
+.schedule s { text-decoration: line-through; }.schedule-time { flex: 0 0 9em; white-space: nowrap; }
 .schedule-what { flex: 1 1 auto; }
-.schedule .schedule-what a { text-decoration: underline; word-break: break-word; }
-
-/* phones: put the time above the event */
+.schedule .schedule-what a { text-decoration: underline; word-break: break-word; }/* phones: put the time above the event */
 @media (max-width: 480px) {
 	.schedule-day li { display: block; padding: 0.0em 0; }
 	.schedule-time { display: block; font-weight: bold; }
