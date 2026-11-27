@@ -1,17 +1,19 @@
 <?php
 
 /**
-* Google Doc schedule: turns a Google Doc into schedule HTML.
+* Google Doc schedule: turns a Google Doc into HTML that looks like the doc.
 *
 * Used by tools/build.php, which the GitHub Action runs. Visitors never run
 * this file: GitHub Pages only serves the finished HTML.
 *
-* Bold, italic, underline, text colour, highlight colour and links come
-* across from the doc. Fonts and font sizes do not: the site's CSS sets those.
+* What you see in the doc is what you get, with no guessing:
+*   - every line, blank line and space, as typed
+*   - bold, italic, underline, strike-through, only where the doc has them
+*   - text colour, highlight colour, text size (relative to the doc's normal size)
+*   - links, alignment, line spacing, space before/after paragraphs, indents
+*   - bulleted and numbered lists, tables (with their borders), horizontal lines
+* Not copied: the font itself (the site's font is used) and pictures.
 */
-
-
-
 
 
 /**
@@ -27,33 +29,29 @@ function gdoc_schedule_problem($set = null)
 
 
 /**
-* Downloads the doc and turns it into schedule HTML. Returns false on any problem.
-* Uses Google's web-page version of the doc (which has the bold and colours).
+* Downloads the doc and turns it into HTML. Returns false on any problem.
+* Uses Google's web-page version of the doc (which has the formatting).
 * On a server that can't read that, it falls back to the plain text version.
 */
 function gdoc_schedule_build($source)
 {
-	$lines = false;
-
 	if (class_exists('DOMDocument'))
 	{
 		$page = gdoc_schedule_fetch($source . 'html', false);
 		if ($page === false) return false;
 
-		$lines = gdoc_schedule_lines_from_html($page);
-		if ($lines === false) gdoc_schedule_problem('Google sent the doc but it could not be read.');
+		$html = gdoc_schedule_from_html($page);
+		if ($html !== false) return $html;
+
+		gdoc_schedule_problem('Google sent the doc but it could not be read.');
 	}
 
-	if ($lines === false)
-	{
-		$text = gdoc_schedule_fetch($source . 'txt', true);
-		if ($text === false) return false;
+	$text = gdoc_schedule_fetch($source . 'txt', true);
+	if ($text === false) return false;
 
-		$lines = gdoc_schedule_lines_from_text($text);
-	}
-
-	return gdoc_schedule_render($lines);
+	return gdoc_schedule_from_text($text);
 }
+
 
 
 /**
@@ -246,244 +244,6 @@ function gdoc_schedule_is_signin($url)
 }
 
 
-// ------------------------------------------------------- reading the doc
-//
-// Both readers return a list of lines. A blank line is null. Any other line is
-//   array('kind' => 'text' | 'heading' | 'title', 'runs' => array(...))
-// and each run is a piece of text with one look:
-//   array('text' => '...', 'style' => array(...), 'href' => '...')
-
-
-function gdoc_schedule_plain_style()
-{
-	return array('b' => false, 'i' => false, 'u' => false, 's' => false, 'c' => '', 'bg' => '');
-}
-
-
-/**
-* Reads the plain text version of the doc (no bold or colours).
-*/
-function gdoc_schedule_lines_from_text($text)
-{
-	$lines = array();
-
-	foreach (explode("\n", $text) as $line)
-	{
-		$line = trim(str_replace(array("\t", "\xC2\xA0"), ' ', $line));
-
-		// drop the bullet characters Google adds for list items
-		if (strpos($line, '* ') === 0 || strpos($line, '- ') === 0) $line = substr($line, 2);
-		if (strpos($line, "\xE2\x80\xA2") === 0) $line = substr($line, 3);
-
-		$run = array('text' => $line, 'style' => gdoc_schedule_plain_style(), 'href' => '');
-		$lines[] = gdoc_schedule_line(array($run), 'text');
-	}
-
-	return $lines;
-}
-
-
-/**
-* Reads Google's web-page version of the doc. Returns false if it can't be read.
-*/
-function gdoc_schedule_lines_from_html($page)
-{
-	$before = libxml_use_internal_errors(true);
-	$dom = new DOMDocument();
-	$ok = $dom->loadHTML('<?xml encoding="UTF-8">' . $page);
-	libxml_clear_errors();
-	libxml_use_internal_errors($before);
-
-	if (!$ok) return false;
-
-	$body = $dom->getElementsByTagName('body')->item(0);
-	if (!$body) return false;
-
-	// Google describes each look as a named rule, like .c4{font-weight:700}
-	$rules = array();
-
-	foreach ($dom->getElementsByTagName('style') as $style)
-	{
-		if (preg_match_all('/\.([A-Za-z0-9_-]+)\s*\{([^}]*)\}/', $style->textContent, $found, PREG_SET_ORDER))
-		{
-			foreach ($found as $rule)
-			{
-				$rules[$rule[1]] = (isset($rules[$rule[1]]) ? $rules[$rule[1]] . ';' : '') . $rule[2];
-			}
-		}
-	}
-
-	$lines = array();
-	gdoc_schedule_walk($body, $rules, $lines);
-
-	return $lines;
-}
-
-
-/**
-* Goes through the doc top to bottom collecting its lines.
-*/
-function gdoc_schedule_walk($node, $rules, &$lines)
-{
-	foreach ($node->childNodes as $child)
-	{
-		if ($child->nodeType != XML_ELEMENT_NODE) continue;
-
-		$tag = strtolower($child->nodeName);
-		$is_heading = (bool) preg_match('/^h[1-6]$/', $tag);
-
-		if ($tag == 'p' || $tag == 'li' || $is_heading)
-		{
-			$classes = ' ' . strtolower($child->getAttribute('class')) . ' ';
-
-			// "Title" and "Heading 1" in the doc are the schedule's title,
-			// the smaller headings each start a new day
-			$kind = 'text';
-			if ($is_heading) $kind = 'heading';
-			if ($tag == 'h1' || strpos($classes, ' title ') !== false) $kind = 'title';
-
-			// a paragraph can hold several lines (shift+enter)
-			$found = array(array());
-			$style = gdoc_schedule_style($child, $rules, gdoc_schedule_plain_style());
-			gdoc_schedule_runs($child, $rules, $style, '', $found);
-
-			foreach ($found as $runs) $lines[] = gdoc_schedule_line($runs, $kind);
-		}
-		elseif ($tag == 'tr')
-		{
-			// a table row becomes one line: "9:00 am | Morning sitting"
-			$row = array();
-
-			foreach ($child->childNodes as $cell)
-			{
-				if ($cell->nodeType != XML_ELEMENT_NODE) continue;
-
-				$found = array(array());
-				gdoc_schedule_runs($cell, $rules, gdoc_schedule_plain_style(), '', $found);
-
-				foreach ($found as $runs)
-				{
-					foreach ($runs as $run) $row[] = $run;
-					$row[] = array('text' => ' ', 'style' => gdoc_schedule_plain_style(), 'href' => '');
-				}
-			}
-
-			$lines[] = gdoc_schedule_line($row, 'text');
-		}
-		elseif ($tag == 'hr')
-		{
-			$lines[] = null;
-		}
-		elseif ($tag == 'style' || $tag == 'script' || $tag == 'head')
-		{
-			continue;
-		}
-		else
-		{
-			gdoc_schedule_walk($child, $rules, $lines);
-		}
-	}
-}
-
-
-/**
-* Collects the pieces of text inside one paragraph, each with its look.
-*/
-function gdoc_schedule_runs($node, $rules, $style, $href, &$found)
-{
-	foreach ($node->childNodes as $child)
-	{
-		if ($child->nodeType == XML_TEXT_NODE)
-		{
-			if ($child->nodeValue !== '')
-			{
-				$found[count($found) - 1][] = array('text' => $child->nodeValue, 'style' => $style, 'href' => $href);
-			}
-
-			continue;
-		}
-
-		if ($child->nodeType != XML_ELEMENT_NODE) continue;
-
-		$tag = strtolower($child->nodeName);
-
-		if ($tag == 'br')
-		{
-			$found[] = array();
-			continue;
-		}
-
-		if ($tag == 'style' || $tag == 'script') continue;
-
-		// separate paragraphs (inside a table cell) don't run together
-		if (($tag == 'p' || $tag == 'div' || $tag == 'li') && $found[count($found) - 1]) $found[] = array();
-
-		$link =($tag == 'a' && $child->hasAttribute('href')) ? gdoc_schedule_link($child->getAttribute('href')) : $href;
-
-		gdoc_schedule_runs($child, $rules, gdoc_schedule_style($child, $rules, $style), $link, $found);
-	}
-}
-
-
-/**
-* Works out the look of one element, starting from the look around it.
-* Only bold, italic, underline, strike-through and the two colours are kept.
-*/
-function gdoc_schedule_style($element, $rules, $style)
-{
-	$tag = strtolower($element->nodeName);
-
-	if ($tag == 'b' || $tag == 'strong') $style['b'] = true;
-	if ($tag == 'i' || $tag == 'em') $style['i'] = true;
-	if ($tag == 'u') $style['u'] = true;
-	if ($tag == 's' || $tag == 'strike' || $tag == 'del') $style['s'] = true;
-
-	$css = '';
-
-	foreach (preg_split('/\s+/', trim($element->getAttribute('class'))) as $class)
-	{
-		if ($class != '' && isset($rules[$class])) $css .= ';' . $rules[$class];
-	}
-
-	$css .= ';' . $element->getAttribute('style');
-
-	foreach (explode(';', $css) as $declaration)
-	{
-		$pair = explode(':', $declaration, 2);
-		if (count($pair) != 2) continue;
-
-		$name = strtolower(trim($pair[0]));
-		$value = trim(str_replace('!important', '', strtolower($pair[1])));
-
-		if ($name == 'font-weight')
-		{
-			$style['b'] = ($value == 'bold' || $value == 'bolder' || (is_numeric($value) && $value >= 600));
-		}
-		elseif ($name == 'font-style')
-		{
-			$style['i'] = ($value == 'italic' || $value == 'oblique');
-		}
-		elseif ($name == 'text-decoration' || $name == 'text-decoration-line')
-		{
-			$style['u'] = (strpos($value, 'underline') !== false);
-			$style['s'] = (strpos($value, 'line-through') !== false);
-		}
-		elseif ($name == 'color')
-		{
-			// black is the doc's normal text colour: leave that to the site
-			$colour = gdoc_schedule_colour($value);
-			$style['c'] = ($colour == '#000000') ? '' : $colour;
-		}
-		elseif ($name == 'background-color' || $name == 'background')
-		{
-			// white is the doc's normal page colour
-			$colour = gdoc_schedule_colour($value);
-			$style['bg'] = ($colour == '#ffffff') ? '' : $colour;
-		}
-	}
-
-	return $style;
-}
 
 
 /**
@@ -527,231 +287,524 @@ function gdoc_schedule_link($href)
 }
 
 
-/**
-* Tidies the spacing in one line. Returns null if the line is blank,
-* or has no letters or numbers in it (a row of dashes, for example).
-*/
-function gdoc_schedule_line($runs, $kind)
-{
-	$clean = array();
-
-	foreach ($runs as $run)
-	{
-		$text = preg_replace('/[ \t\r\n]+/', ' ', str_replace("\xC2\xA0", ' ', $run['text']));
-		$last = count($clean) - 1;
-
-		// no spaces to open the line, and never two in a row
-		if ($last < 0 || substr($clean[$last]['text'], -1) == ' ') $text = ltrim($text, ' ');
-		if ($text === '') continue;
-
-		if ($last >= 0 && $clean[$last]['style'] == $run['style'] && $clean[$last]['href'] == $run['href'])
-		{
-			$clean[$last]['text'] .= $text;
-		}
-		else
-		{
-			$clean[] = array('text' => $text, 'style' => $run['style'], 'href' => $run['href']);
-		}
-	}
-
-	// no spaces to close the line
-	while ($clean)
-	{
-		$last = count($clean) - 1;
-		$clean[$last]['text'] = rtrim($clean[$last]['text'], ' ');
-
-		if ($clean[$last]['text'] !== '') break;
-		array_pop($clean);
-	}
-
-	if (!preg_match('/[A-Za-z0-9\x80-\xFF]/', gdoc_schedule_plain($clean))) return null;
-
-	return array('kind' => $kind, 'runs' => $clean);
-}
 
 
-function gdoc_schedule_plain($runs)
-{
-	$text = '';
-	foreach ($runs as $run) $text .= $run['text'];
-
-	return $text;
-}
-
-
-// ----------------------------------------------------- writing the HTML
+// ------------------------------------------------------- converting the doc
 
 
 /**
-* Turns the lines into the schedule's HTML.
+* The plain text version (no formatting): each line as it was typed.
 */
-function gdoc_schedule_render($lines)
+function gdoc_schedule_from_text($text)
 {
-	// gather the lines into groups: a blank line or a heading starts a new one
-	$blocks = array();
-	$current = array();
+	$out = '';
 
-	foreach ($lines as $line)
+	foreach (explode("\n", rtrim($text)) as $line)
 	{
-		if ($line === null || $line['kind'] != 'text')
-		{
-			if ($current) $blocks[] = $current;
-			$current = array();
-		}
-
-		if ($line === null) continue;
-
-		$current[] = $line;
-
-		if ($line['kind'] == 'title')
-		{
-			$blocks[] = $current;
-			$current = array();
-		}
+		$line = rtrim($line, "\r");
+		$out .= (trim(str_replace("\xC2\xA0", ' ', $line)) === '')
+			? "<p class='gs-blank'><br></p>\n"
+			: '<p>' . htmlspecialchars($line, ENT_QUOTES, 'UTF-8') . "</p>\n";
 	}
 
-	if ($current) $blocks[] = $current;
+	return "<div class='schedule gdoc'>\n" . $out . "</div>\n";
+}
 
-	if (!$blocks) return "<p class='schedule-note'>Nothing is scheduled right now.</p>\n";
 
-	$s = "<div class='schedule'>\n";
+/**
+* Google's web-page version of the doc. Returns false if it can't be read.
+*/
+function gdoc_schedule_from_html($page)
+{
+	$before = libxml_use_internal_errors(true);
+	$dom = new DOMDocument();
+	$ok = $dom->loadHTML('<?xml encoding="UTF-8">' . $page);
+	libxml_clear_errors();
+	libxml_use_internal_errors($before);
 
-	foreach ($blocks as $n => $block)
+	if (!$ok) return false;
+
+	$body = $dom->getElementsByTagName('body')->item(0);
+	if (!$body) return false;
+
+	// Google describes each look as a named rule, like .c4{font-weight:700},
+	// plus rules for whole kinds of paragraph, like h2{font-size:16pt}
+	$css = '';
+	foreach ($dom->getElementsByTagName('style') as $style) $css .= $style->textContent;
+
+	$doc = array('classes' => array(), 'tags' => array(), 'base' => 11.0);
+
+	if (preg_match_all('/([^{}]+)\{([^}]*)\}/', $css, $found, PREG_SET_ORDER))
 	{
-		$first = array_shift($block);
-		$alone = (count($block) == 0);
-
-		// the title: marked as one in the doc, or a short line on its own that opens the doc
-		if ($first['kind'] == 'title' || ($alone && $n == 0 && $first['kind'] == 'text' && strlen(gdoc_schedule_plain($first['runs'])) <= 80))
+		foreach ($found as $rule)
 		{
-			$s .= "<h2 class='schedule-title'>" . gdoc_schedule_inline($first['runs']) . "</h2>\n";
-			continue;
-		}
+			$selector = trim($rule[1]);
 
-		// any other line on its own is a note
-		if ($alone && $first['kind'] == 'text')
-		{
-			$s .= "<p class='schedule-note'>" . gdoc_schedule_inline($first['runs']) . "</p>\n";
-			continue;
-		}
-
-		$s .= "<div class='schedule-day'>\n";
-		$s .= "<h3>" . gdoc_schedule_inline($first['runs']) . "</h3>\n";
-
-		if ($block)
-		{
-			$s .= "<ul>\n";
-
-			foreach ($block as $line)
+			if (preg_match('/^\.([A-Za-z0-9_-]+)$/', $selector, $m))
 			{
-				$parts = gdoc_schedule_time($line['runs']);
+				$doc['classes'][$m[1]] = (isset($doc['classes'][$m[1]]) ? $doc['classes'][$m[1]] . ';' : '') . $rule[2];
+			}
+			elseif (preg_match('/^(p|li|h[1-6])$/', $selector, $m))
+			{
+				$doc['tags'][$m[1]] = (isset($doc['tags'][$m[1]]) ? $doc['tags'][$m[1]] . ';' : '') . $rule[2];
+			}
+		}
+	}
 
-				$s .= ($parts)
-					? "<li><span class='schedule-time'>" . gdoc_schedule_inline($parts[0]) . "</span> <span class='schedule-what'>" . gdoc_schedule_inline($parts[1]) . "</span></li>\n"
-					: "<li><span class='schedule-what schedule-wide'>" . gdoc_schedule_inline($line['runs']) . "</span></li>\n";
+	// the doc's normal text size: sizes on the site are relative to it
+	$normal = gdoc_schedule_props(isset($doc['tags']['p']) ? $doc['tags']['p'] : '', array());
+	if (!empty($normal['size'])) $doc['base'] = $normal['size'];
+
+	$blocks = array();
+	gdoc_schedule_blocks($body, $doc, $blocks);
+
+	// a blank line at the very end of a doc isn't visible there, so leave those off
+	while ($blocks && $blocks[count($blocks) - 1] === "<p class='gs-blank'><br></p>") array_pop($blocks);
+
+	if (!$blocks) return "<div class='schedule gdoc'>\n<p>Nothing is scheduled right now.</p>\n</div>\n";
+
+	return "<div class='schedule gdoc'>\n" . implode("\n", $blocks) . "\n</div>\n";
+}
+
+
+/**
+* Goes through the doc top to bottom, turning each paragraph, list,
+* table and line into HTML.
+*/
+function gdoc_schedule_blocks($node, $doc, &$blocks)
+{
+	foreach ($node->childNodes as $child)
+	{
+		if ($child->nodeType != XML_ELEMENT_NODE) continue;
+
+		$tag = strtolower($child->nodeName);
+
+		if ($tag == 'p' || preg_match('/^h[1-6]$/', $tag))
+		{
+			$blocks[] = gdoc_schedule_paragraph($child, $doc, 'p');
+		}
+		elseif ($tag == 'ul' || $tag == 'ol')
+		{
+			$blocks[] = gdoc_schedule_list($child, $doc);
+		}
+		elseif ($tag == 'table')
+		{
+			$blocks[] = gdoc_schedule_table($child, $doc);
+		}
+		elseif ($tag == 'hr')
+		{
+			$blocks[] = '<hr>';
+		}
+		elseif ($tag != 'style' && $tag != 'script' && $tag != 'head')
+		{
+			gdoc_schedule_blocks($child, $doc, $blocks);
+		}
+	}
+}
+
+
+/**
+* One paragraph (or list item, with $as = 'li').
+*/
+function gdoc_schedule_paragraph($element, $doc, $as)
+{
+	$look = gdoc_schedule_look($element, $doc, gdoc_schedule_empty_look(), true);
+
+	$runs = array();
+	gdoc_schedule_runs($element, $doc, $look, '', $runs);
+
+	// the paragraph's own layout: alignment, line spacing, space around it, indent
+	$css = array();
+	$em = function ($pt) use ($doc) { return round($pt / $doc['base'], 3) . 'em'; };
+
+	if (in_array($look['align'], array('center', 'right', 'justify'))) $css[] = 'text-align:' . $look['align'];
+	if ($look['lh'] > 0) $css[] = 'line-height:' . $look['lh'];
+	if ($look['pt'] > 0) $css[] = 'padding-top:' . $em($look['pt']);
+	if ($look['pb'] > 0) $css[] = 'padding-bottom:' . $em($look['pb']);
+	if ($as == 'p' && $look['ml'] > 0) $css[] = 'margin-left:' . $em($look['ml']);
+	if ($look['ti'] != 0) $css[] = 'text-indent:' . $em($look['ti']);
+
+	$attr = $css ? " style='" . implode(';', $css) . "'" : '';
+
+	// a line with nothing on it is a blank line, kept as one
+	$visible = '';
+	foreach ($runs as $run) if ($run !== 'br') $visible .= $run['text'];
+
+	if (trim(str_replace("\xC2\xA0", ' ', $visible)) === '' && !in_array('br', $runs, true))
+	{
+		return ($as == 'li') ? "<li$attr><br></li>" : "<p class='gs-blank'><br></p>";
+	}
+
+	return "<$as$attr>" . gdoc_schedule_write($runs, $doc) . "</$as>";
+}
+
+
+/**
+* A bulleted or numbered list. Google writes each level of indent as its own
+* list, named like "lst-kix_abc-1" (the last number is the level).
+*/
+function gdoc_schedule_list($element, $doc)
+{
+	$tag = strtolower($element->nodeName);
+	$level = preg_match('/lst-kix_\S+-(\d+)/', $element->getAttribute('class'), $m) ? min(8, (int) $m[1]) : 0;
+
+	$marks = ($tag == 'ol') ? array('decimal', 'lower-alpha', 'lower-roman') : array('disc', 'circle', 'square');
+	$css = 'list-style-type:' . $marks[$level % 3] . ($level ? ';margin-left:' . (1.5 * $level) . 'em' : '');
+
+	$start = ($tag == 'ol' && ctype_digit($element->getAttribute('start')) && $element->getAttribute('start') > 1)
+		? " start='" . (int) $element->getAttribute('start') . "'" : '';
+
+	$items = array();
+
+	foreach ($element->childNodes as $li)
+	{
+		if ($li->nodeType == XML_ELEMENT_NODE && strtolower($li->nodeName) == 'li') $items[] = gdoc_schedule_paragraph($li, $doc, 'li');
+	}
+
+	return "<$tag class='gs-list'$start style='$css'>\n" . implode("\n", $items) . "\n</$tag>";
+}
+
+
+/**
+* A table, with each cell's paragraphs, borders, padding and background.
+*/
+function gdoc_schedule_table($table, $doc)
+{
+	$s = "<table class='gs-table'>\n";
+
+	foreach ($table->getElementsByTagName('tr') as $tr)
+	{
+		$s .= '<tr>';
+
+		foreach ($tr->childNodes as $cell)
+		{
+			if ($cell->nodeType != XML_ELEMENT_NODE || !in_array(strtolower($cell->nodeName), array('td', 'th'))) continue;
+
+			$inside = array();
+			gdoc_schedule_blocks($cell, $doc, $inside);
+
+			$span = '';
+			foreach (array('colspan', 'rowspan') as $name)
+			{
+				$n = $cell->getAttribute($name);
+				if (ctype_digit($n) && $n > 1) $span .= " $name='" . (int) $n . "'";
 			}
 
-			$s .= "</ul>\n";
+			$css = gdoc_schedule_cell_css($cell, $doc);
+			$s .= "<td$span" . ($css ? " style='$css'" : '') . '>' . implode('', $inside) . '</td>';
 		}
 
-		$s .= "</div>\n";
+		$s .= "</tr>\n";
 	}
 
-	$s .= "</div>\n";
-
-	return $s;
+	return $s . '</table>';
 }
 
 
 /**
-* If a line starts with a time ("9:00 am", "7pm", "9:00 - 10:30 am", "Noon")
-* returns array(the time, the rest), each with its bold and colours intact.
-* Otherwise returns false.
+* Only the cell settings we understand, with checked values.
 */
-function gdoc_schedule_time($runs)
+function gdoc_schedule_cell_css($cell, $doc)
 {
-	$line = gdoc_schedule_plain($runs);
-
-	$one = '(?:\d{1,2}(?::\d{2})?\s*(?:[ap]\.?m\b\.?)?|noon\b|midnight\b)';
-	$dash = '(?:-|\x{2013}|\x{2014}|\bto\b)';
-	$f = '/^(' . $one . '(?:\s*' . $dash . '\s*' . $one . ')?)(?:\s*(?:' . $dash . '|:|\|)\s+|\s+)(\S.*)$/iu';
-
-	if (!preg_match($f, $line, $m, PREG_OFFSET_CAPTURE)) return false;
-
-	// a bare number ("3 bells") is not a time: it needs a colon, am/pm or a word
-	if (!preg_match('/:|[ap]\.?m|noon|midnight/i', $m[1][0])) return false;
-
-	$time = gdoc_schedule_line(gdoc_schedule_slice($runs, 0, strlen($m[1][0])), 'text');
-	$what = gdoc_schedule_line(gdoc_schedule_slice($runs, $m[2][1], strlen($line)), 'text');
-
-	if (!$time || !$what) return false;
-
-	return array($time['runs'], $what['runs']);
-}
-
-
-/**
-* Cuts out part of a line, from one position to another.
-*/
-function gdoc_schedule_slice($runs, $from, $to)
-{
+	$decl = gdoc_schedule_declarations($cell, $doc, false);
 	$out = array();
-	$at = 0;
 
-	foreach ($runs as $run)
+	foreach ($decl as $name => $value)
 	{
-		$length = strlen($run['text']);
-		$a = max($from, $at) - $at;
-		$b = min($to, $at + $length) - $at;
-
-		if ($b > $a)
+		if (preg_match('/^border-(top|right|bottom|left)-width$/', $name) && preg_match('/^([\d.]+)pt$/', $value, $m))
 		{
-			$run['text'] = substr($run['text'], $a, $b - $a);
-			$out[] = $run;
+			$out[$name] = $name . ':' . min(10, (float) $m[1]) . 'pt';
 		}
-
-		$at += $length;
+		elseif (preg_match('/^border-(top|right|bottom|left)-style$/', $name) && in_array($value, array('solid', 'dashed', 'dotted', 'double', 'none')))
+		{
+			$out[$name] = $name . ':' . $value;
+		}
+		elseif (preg_match('/^border-(top|right|bottom|left)-color$|^background-color$/', $name) && gdoc_schedule_colour($value) != '')
+		{
+			$out[$name] = $name . ':' . gdoc_schedule_colour($value);
+		}
+		elseif (preg_match('/^padding-(top|right|bottom|left)$/', $name) && preg_match('/^([\d.]+)pt$/', $value, $m))
+		{
+			$out[$name] = $name . ':' . round(min(72, (float) $m[1]) / $doc['base'], 3) . 'em';
+		}
+		elseif ($name == 'vertical-align' && in_array($value, array('top', 'middle', 'bottom')))
+		{
+			$out[$name] = 'vertical-align:' . $value;
+		}
 	}
 
-	return $out;
+	return implode(';', $out);
+}
+
+
+// ------------------------------------------------------- the look of text
+
+
+function gdoc_schedule_empty_look()
+{
+	return array(
+		// text
+		'b' => false, 'i' => false, 'u' => false, 's' => false,
+		'c' => '', 'bg' => '', 'size' => 0, 'va' => '',
+		// paragraph
+		'align' => '', 'lh' => 0, 'pt' => 0, 'pb' => 0, 'ml' => 0, 'ti' => 0
+	);
 }
 
 
 /**
-* Writes out one line's pieces. Everything is made safe to print: nothing
-* typed in the doc can add HTML or scripts to the site. The only markup that
-* comes out is bold, italic, underline, strike-through, colours and links.
+* All the style settings that apply to an element, in order: the rule for its
+* kind of paragraph (only for the paragraph itself), its named rules, then its own.
 */
-function gdoc_schedule_inline($runs)
+function gdoc_schedule_declarations($element, $doc, $with_tag)
 {
-	$s = '';
+	$tag = strtolower($element->nodeName);
+	$css = ($with_tag && isset($doc['tags'][$tag])) ? $doc['tags'][$tag] : '';
+
+	foreach (preg_split('/\s+/', trim($element->getAttribute('class'))) as $class)
+	{
+		if ($class != '' && isset($doc['classes'][$class])) $css .= ';' . $doc['classes'][$class];
+	}
+
+	$css .= ';' . $element->getAttribute('style');
+
+	$decl = array();
+
+	foreach (explode(';', $css) as $declaration)
+	{
+		$pair = explode(':', $declaration, 2);
+		if (count($pair) != 2) continue;
+
+		$name = strtolower(trim($pair[0]));
+		$value = trim(str_replace('!important', '', strtolower($pair[1])));
+
+		// "padding:5pt 5pt 5pt 5pt" is shorthand for the four sides
+		if ($name == 'padding')
+		{
+			$v = preg_split('/\s+/', $value);
+			$v = array_pad($v, 4, null);
+			$top = $v[0]; $right = isset($v[1]) ? $v[1] : $top; $bottom = isset($v[2]) ? $v[2] : $top; $left = isset($v[3]) ? $v[3] : $right;
+			$decl['padding-top'] = $top; $decl['padding-right'] = $right; $decl['padding-bottom'] = $bottom; $decl['padding-left'] = $left;
+			continue;
+		}
+
+		$decl[$name] = $value;
+	}
+
+	return $decl;
+}
+
+
+/**
+* Works out the look of one element, starting from the look around it.
+*/
+function gdoc_schedule_look($element, $doc, $look, $is_paragraph)
+{
+	$tag = strtolower($element->nodeName);
+
+	if ($tag == 'b' || $tag == 'strong') $look['b'] = true;
+	if ($tag == 'i' || $tag == 'em') $look['i'] = true;
+	if ($tag == 'u') $look['u'] = true;
+	if ($tag == 's' || $tag == 'strike' || $tag == 'del') $look['s'] = true;
+	if ($tag == 'sup') $look['va'] = 'super';
+	if ($tag == 'sub') $look['va'] = 'sub';
+
+	return gdoc_schedule_props(gdoc_schedule_declarations($element, $doc, $is_paragraph), $look);
+}
+
+
+/**
+* Applies style settings (a list, or a CSS string) to a look.
+*/
+function gdoc_schedule_props($decl, $look)
+{
+	if (is_string($decl))
+	{
+		$list = array();
+		foreach (explode(';', $decl) as $d)
+		{
+			$pair = explode(':', $d, 2);
+			if (count($pair) == 2) $list[strtolower(trim($pair[0]))] = trim(strtolower($pair[1]));
+		}
+		$decl = $list;
+	}
+
+	$look += gdoc_schedule_empty_look();
+
+	foreach ($decl as $name => $value)
+	{
+		switch ($name)
+		{
+			case 'font-weight':
+				$look['b'] = ($value == 'bold' || $value == 'bolder' || (is_numeric($value) && $value >= 600));
+				break;
+
+			case 'font-style':
+				$look['i'] = ($value == 'italic' || $value == 'oblique');
+				break;
+
+			case 'text-decoration':
+			case 'text-decoration-line':
+				$look['u'] = (strpos($value, 'underline') !== false);
+				$look['s'] = (strpos($value, 'line-through') !== false);
+				break;
+
+			case 'color':
+				// black is the doc's normal text colour: leave that to the site
+				$colour = gdoc_schedule_colour($value);
+				$look['c'] = ($colour == '#000000') ? '' : $colour;
+				break;
+
+			case 'background-color':
+				// white is the doc's normal page colour
+				$colour = gdoc_schedule_colour($value);
+				$look['bg'] = ($colour == '#ffffff') ? '' : $colour;
+				break;
+
+			case 'font-size':
+				$pt = gdoc_schedule_points($value);
+				if ($pt > 0) $look['size'] = $pt;
+				break;
+
+			case 'vertical-align':
+				$look['va'] = in_array($value, array('super', 'sub')) ? $value : '';
+				break;
+
+			case 'text-align':
+				$look['align'] = in_array($value, array('left', 'center', 'right', 'justify')) ? $value : '';
+				break;
+
+			case 'line-height':
+				$look['lh'] = (is_numeric($value) && $value > 0) ? min(5, (float) $value) : 0;
+				break;
+
+			case 'padding-top':
+				$look['pt'] = gdoc_schedule_points($value);
+				break;
+
+			case 'padding-bottom':
+				$look['pb'] = gdoc_schedule_points($value);
+				break;
+
+			case 'margin-left':
+				$look['ml'] = gdoc_schedule_points($value);
+				break;
+
+			case 'text-indent':
+				$look['ti'] = gdoc_schedule_points($value, true);
+				break;
+		}
+	}
+
+	return $look;
+}
+
+
+/**
+* A size in points ("12pt", "16px"), or 0. Kept within sensible limits.
+*/
+function gdoc_schedule_points($value, $signed = false)
+{
+	if (!preg_match('/^(-?[\d.]+)(pt|px)$/', trim($value), $m)) return 0;
+
+	$pt = (float) $m[1] * (($m[2] == 'px') ? 0.75 : 1);
+	if (!$signed && $pt < 0) return 0;
+
+	return max(-144, min(144, $pt));
+}
+
+
+/**
+* Collects the pieces of text inside a paragraph, each with its look.
+* A line break inside the paragraph (shift+enter) comes through as 'br'.
+*/
+function gdoc_schedule_runs($node, $doc, $look, $href, &$runs)
+{
+	foreach ($node->childNodes as $child)
+	{
+		if ($child->nodeType == XML_TEXT_NODE || $child->nodeType == XML_CDATA_SECTION_NODE)
+		{
+			// spaces are kept exactly; only stray newlines in Google's code become spaces
+			$text = str_replace(array("\r\n", "\n", "\r"), ' ', $child->nodeValue);
+			if ($text !== '') $runs[] = array('text' => $text, 'look' => $look, 'href' => $href);
+			continue;
+		}
+
+		if ($child->nodeType != XML_ELEMENT_NODE) continue;
+
+		$tag = strtolower($child->nodeName);
+
+		if ($tag == 'br') { $runs[] = 'br'; continue; }
+		if ($tag == 'style' || $tag == 'script' || $tag == 'img') continue;
+
+		$link = ($tag == 'a' && $child->hasAttribute('href')) ? gdoc_schedule_link($child->getAttribute('href')) : $href;
+
+		gdoc_schedule_runs($child, $doc, gdoc_schedule_look($child, $doc, $look, false), $link, $runs);
+	}
+}
+
+
+/**
+* Writes out the pieces of a paragraph. Everything is made safe to print:
+* nothing typed in the doc can add HTML or scripts to the site.
+*/
+function gdoc_schedule_write($runs, $doc)
+{
+	// join neighbouring pieces that look the same
+	$merged = array();
 
 	foreach ($runs as $run)
 	{
-		$style = $run['style'];
+		$last = count($merged) - 1;
 
-		if ($run['href'] != '')
+		if ($run !== 'br' && $last >= 0 && $merged[$last] !== 'br'
+			&& gdoc_schedule_text_look($merged[$last]['look']) == gdoc_schedule_text_look($run['look'])
+			&& $merged[$last]['href'] == $run['href'])
 		{
-			$h = "<a href='" . htmlspecialchars($run['href'], ENT_QUOTES, 'UTF-8') . "'>" . htmlspecialchars($run['text'], ENT_QUOTES, 'UTF-8') . "</a>";
-
-			// links keep the site's own link colour and underline
-			$style['c'] = '';
-			$style['u'] = false;
+			$merged[$last]['text'] .= $run['text'];
 		}
 		else
 		{
-			$h = gdoc_schedule_autolink($run['text']);
+			$merged[] = $run;
+		}
+	}
+
+	$s = '';
+
+	foreach ($merged as $run)
+	{
+		if ($run === 'br') { $s .= '<br>'; continue; }
+
+		$look = $run['look'];
+		$h = htmlspecialchars($run['text'], ENT_QUOTES, 'UTF-8');
+
+		// links use the site's own link colour and underline
+		if ($run['href'] != '')
+		{
+			$h = "<a href='" . htmlspecialchars($run['href'], ENT_QUOTES, 'UTF-8') . "'>" . $h . '</a>';
+			$look['c'] = '';
+			$look['u'] = false;
 		}
 
-		if ($style['s']) $h = '<s>' . $h . '</s>';
-		if ($style['u']) $h = '<u>' . $h . '</u>';
-		if ($style['i']) $h = '<em>' . $h . '</em>';
-		if ($style['b']) $h = '<strong>' . $h . '</strong>';
+		if ($look['va'] == 'super') $h = '<sup>' . $h . '</sup>';
+		if ($look['va'] == 'sub') $h = '<sub>' . $h . '</sub>';
+		if ($look['s']) $h = '<s>' . $h . '</s>';
+		if ($look['u']) $h = '<u>' . $h . '</u>';
+		if ($look['i']) $h = '<em>' . $h . '</em>';
+		if ($look['b']) $h = '<strong>' . $h . '</strong>';
 
 		$css = array();
-		if (preg_match('/^#[0-9a-f]{6}$/', $style['c'])) $css[] = 'color:' . $style['c'];
-		if (preg_match('/^#[0-9a-f]{6}$/', $style['bg'])) $css[] = 'background-color:' . $style['bg'];
-		if ($css) $h = "<span style='" . implode(';', $css) . "'>" . $h . "</span>";
+		if (preg_match('/^#[0-9a-f]{6}$/', $look['c'])) $css[] = 'color:' . $look['c'];
+		if (preg_match('/^#[0-9a-f]{6}$/', $look['bg'])) $css[] = 'background-color:' . $look['bg'];
+
+		// sizes are relative to the doc's normal size, so the site's size stays in charge
+		if ($look['size'] > 0)
+		{
+			$ratio = round(max(0.4, min(5, $look['size'] / $doc['base'])), 3);
+			if (abs($ratio - 1) > 0.02) $css[] = 'font-size:' . $ratio . 'em';
+		}
+
+		if ($css) $h = "<span style='" . implode(';', $css) . "'>" . $h . '</span>';
 
 		$s .= $h;
 	}
@@ -760,23 +813,7 @@ function gdoc_schedule_inline($runs)
 }
 
 
-/**
-* Makes plain text safe to print, and turns typed web addresses into links.
-*/
-function gdoc_schedule_autolink($text)
+function gdoc_schedule_text_look($look)
 {
-	$parts = preg_split('~(https?://[^\s<>"\']+[^\s<>"\'.,;:!?)\]])~i', $text, -1, PREG_SPLIT_DELIM_CAPTURE);
-	if ($parts === false) return htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
-
-	$out = '';
-
-	foreach ($parts as $i => $part)
-	{
-		$safe = htmlspecialchars($part, ENT_QUOTES, 'UTF-8');
-
-		// odd pieces are the web addresses
-		$out .= ($i % 2) ? "<a href='" . $safe . "'>" . $safe . "</a>" : $safe;
-	}
-
-	return $out;
+	return array($look['b'], $look['i'], $look['u'], $look['s'], $look['c'], $look['bg'], $look['size'], $look['va']);
 }
