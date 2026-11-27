@@ -1,122 +1,133 @@
-/* ---- schedule (from Google Doc) ----
-   Link this from the page, or paste it into your own stylesheet.
-   It only sets layout and spacing: the font and text colour come from your site. */
-*{
-	font-family: "EB Garamond", serif!important;
-	  font-optical-sizing: auto;
-	  font-weight: <weight>;
-	  font-style: normal;
-	  /*color:darkolivegreen!important;*/
-	  /*font-size:1.2rem;*/
-}
-.schedule { max-width: 600px; }::selection {
- color:blue;
+/* ================================================================
+   Mountain Colors Zen: site styles
+   ================================================================ */
+
+/* the site's font, everywhere */
+* {
+	font-family: "EB Garamond", serif !important;
+	font-optical-sizing: auto;
+	/*color:darkolivegreen!important;*/
+	/*font-size:1.2rem;*/
 }
 
-@media (max-width: 720px) {
-	.logo{
- display: block;
-  margin: auto;
-  width: 70%!important;
-}
+body {
+	background: linear-gradient(0deg, #fff9e6 0%, #ffeae6 100%) !important;
 }
 
-.logo{
- display: block;
-  margin: auto;
-  width: 50%;
-}
-
-.social-instagram{
- display: block;
-  /*margin: auto;*/
-  width: 10%;
-  padding-top: 10%;
+::selection {
+	color: blue;
 }
 
 a:visited {
-  color: forestgreen;
-  text-decoration-color: hotpink;
+	color: forestgreen;
+	text-decoration-color: hotpink;
 }
 
-.title{
-	font-size:2rem;
-	font-family: "EB Garamond", serif!important;
-	  font-optical-sizing: auto;
-	  font-style: normal;
-	  margin-block-start: 0em;
-	  color:darkolivegreen!important;
-	  text-align:center!important;
-	  font-weight:300!important;
+img { border-radius: 5px; }
+
+
+/* ---------------------------------------------------------- top of page */
+
+.title {
+	font-size: 2rem;
+	font-weight: 300 !important;
+	margin-block-start: 0em;
+	color: darkolivegreen !important;
+	text-align: center !important;
 }
 
-table{
-	font-size:1.1rem;
+.logo {
+	display: block;
+	margin: auto;
+	width: 50%;
+}
+
+@media (max-width: 720px) {
+	.logo { width: 70% !important; }
+}
+
+.mcz-intro {
+	font-size: 1.4rem;
+	line-height: 1.7rem;
+	color: darkolivegreen !important;
+	/*text-align:center;*/
+}
+
+
+/* ---------------------------------------------------------- weekly hours tables */
+
+/* (not the tables inside the Google Doc schedule, which keep the doc's own look) */
+table:not(.gs-table) {
+	font-size: 1.1rem;
 	font-family: "IBM Plex Sans", sans-serif;
 	border-spacing: 0px;
-	color:darkolivegreen!important}footer{
-	margin-top:2rem;
+	color: darkolivegreen !important;
+}
+
+
+/* ---------------------------------------------------------- schedule from the Google Doc */
+
+/* The schedule is laid out exactly as in the doc: lines, blank lines, spaces,
+   bold, colours, sizes and alignment all come from the doc itself.
+   These rules only make sure the site doesn't add anything of its own. */
+
+.time {
+	margin-top: 4rem;
+	margin-bottom: 4rem;
+}
+
+.gdoc { max-width: 600px; }
+
+/* each line of the doc, with its spaces kept */
+.gdoc p { margin: 0; padding: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-weight: normal; }
+
+/* bold, italic etc. only where the doc has them */
+.gdoc strong { font-weight: bold; }
+.gdoc em { font-style: italic; }
+.gdoc u { text-decoration: underline; }
+.gdoc s { text-decoration: line-through; }
+
+/* lists */
+.gdoc ul, .gdoc ol { margin: 0; padding-left: 1.5em; }
+.gdoc li { white-space: pre-wrap; }
+
+/* tables: borders and padding come from the doc */
+.gdoc table { border-collapse: collapse; }
+.gdoc td { padding: 0; vertical-align: top; }
+
+/* horizontal line */
+.gdoc hr { border: 0; border-top: 1px solid currentColor; opacity: 0.4; margin: 0.5em 0; }
+
+.gdoc a { word-break: break-word; }
+
+
+/* ---------------------------------------------------------- bottom of page */
+
+footer {
+	margin-top: 2rem;
 	/*text-align:center;*/
-}.mcz-intro{
-	font-size:1.4rem;
-	line-height:1.7rem;
-	font-family: "EB Garamond", serif!important;
-	  font-optical-sizing: auto;
-	  font-style: normal;
-	  color:darkolivegreen!important;
-	  /*text-align:center;*/
 }
-body{  background: linear-gradient(0deg, #fff9e6 0%, #ffeae6 100%)!important;
+
+.social-instagram {
+	display: block;
+	/*margin: auto;*/
+	width: 10%;
+	padding-top: 10%;
 }
-.schedule .schedule-title { font-size: 1.4em; line-height: 1.2; font-weight: bold; margin: 0 0 1.2em; 
-	font-family: "EB Garamond", serif!important;
-	  font-optical-sizing: auto;
-	  font-weight: <weight>;
-	  font-style: normal;}
-.schedule .schedule-note { margin: 0 0 1.5em; }.schedule-day { margin: 0 0 .5em; padding-top: 0.0em; border-top: .1px solid #ccc; }
-.schedule-day h3 { font-size: 1.1em; margin: 0 0 0.4em; 
-	  font-family: "IBM Plex Sans", sans-serif;
-	  font-optical-sizing: auto;
-	  font-weight: <weight>;
-	  font-style: normal;}.schedule-day ul { list-style: none; margin: 0; padding: 0; 
-	font-family: "EB Garamond", serif!important;
-	  font-optical-sizing: auto;
-	  font-weight: <weight>;
-	  font-style: normal;
-	  padding:0!important;
-	}
-.schedule-day li { display: flex; gap: 1em; padding: 0; 
-	font-family: "EB Garamond", serif!important;
-	  font-optical-sizing: auto;
-	  font-weight: <weight>;
-	  font-style: normal;
-	  padding:0!important;
-	}	.donate{
-		font-size:1.4rem;
-		width:100%;
-		border: none;
-		background:pink;
-		border-radius:50px;
-		padding:.5rem;
-		margin-top:2rem;
-		margin-bottom:2rem;
-	}	.donate:focus{background-color:red;}
-	.donate:hover{
-		background-color:white;
-		transition:.5s;
-	}
-		
-.time{
-	margin-top:4rem;
-	margin-bottom:4rem;
-}img {border-radius:5px;}/* bold, italic etc. carried over from the doc */
-.schedule strong { font-weight: bold; }
-.schedule em { font-style: italic; }
-.schedule u { text-decoration: underline; }
-.schedule s { text-decoration: line-through; }.schedule-time { flex: 0 0 9em; white-space: nowrap; }
-.schedule-what { flex: 1 1 auto; }
-.schedule .schedule-what a { text-decoration: underline; word-break: break-word; }/* phones: put the time above the event */
-@media (max-width: 480px) {
-	.schedule-day li { display: block; padding: 0.0em 0; }
-	.schedule-time { display: block; font-weight: bold; }
+
+/* donate button (saved for later; it's commented out in the page) */
+.donate {
+	font-size: 1.4rem;
+	width: 100%;
+	border: none;
+	background: pink;
+	border-radius: 50px;
+	padding: .5rem;
+	margin-top: 2rem;
+	margin-bottom: 2rem;
+}
+.donate:focus { background-color: red; }
+.donate:hover {
+	background-color: white;
+	transition: .5s;
 }
